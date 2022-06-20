@@ -173,13 +173,13 @@ namespace PixelPerfect
                 }
                 catch (Exception ex)
                 {
-                    PluginLog.Error(ex.ToString());
+                    /*PluginLog.Error(ex.ToString());*/
                 }
 #else
                 UpdateTargetStatus();
 
                 
-        #endif
+#endif
         }
 
         private void UpdateTargetStatus()
@@ -240,11 +240,11 @@ namespace PixelPerfect
 
                     if (_nid)
                     {
-                        if (statusId == 2757)
+                        if (statusId == 2756)
                         {
                             nid_f_flag = true;
                         }
-                        else if(statusId == 2756)
+                        else if(statusId == 2757)
                         {
                             nid_b_flag = true;
                         }
@@ -593,14 +593,6 @@ namespace PixelPerfect
                 ImGui.PushStyleColor(ImGuiCol.ButtonActive, 0xDD000000 | 0x005E5BFF);
                 ImGui.PushStyleColor(ImGuiCol.ButtonHovered, 0xAA000000 | 0x005E5BFF);
 
-                if (ImGui.Button("Buy Haplo a Hot Chocolate"))
-                {
-                    Process.Start(new ProcessStartInfo
-                    {
-                        FileName = "https://ko-fi.com/haplo",
-                        UseShellExecute = true
-                    });
-                }
 
                 ImGui.PopStyleColor(3);
                 ImGui.End();
