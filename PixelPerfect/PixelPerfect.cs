@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using Dalamud.Configuration;
 using Dalamud.Game;
@@ -16,6 +17,10 @@ namespace PixelPerfect
     public class PixelPerfect : IDalamudPlugin
     {
         public string Name => "Pixel Perfect";
+
+        public static SigScanner SigScanner { get; private set; }
+        public static ChatGui _chat { get; private set; }
+
         private readonly DalamudPluginInterface _pi;
         private readonly CommandManager _cm;
         private readonly ClientState _cs;
@@ -47,26 +52,46 @@ namespace PixelPerfect
         private bool _north1;
         private bool _north2;
         private bool _north3;
+        private bool _face;
+        private bool _ref;
+        private bool _auto;
+        private bool _nid;
+        private int _statusId;
+        private bool _showid;
+        private bool _showself;
+        private bool _nid_f;
+        private bool _nid_b;
         private float _lineOffset = 0.6f;
         private float _lineLength = 1f;
+        private float _faceLineLength = 1f;
+        private float _refLineLength = 1f;
         private float _chevLength = 0.5f;
         private float _chevOffset = 0.5f;
         private float _chevRad = 0.5f;
         private float _chevSin = 0.5f;
         private float _chevThicc = 10f;
         private float _lineThicc = 10f;
+        private float _faceLineThicc = 10f;
+        private float _refLineThicc = 10f;
         private Num.Vector4 _chevCol = new Num.Vector4(1f, 1f, 1f, 1f);
         private Num.Vector4 _lineCol = new Num.Vector4(1f, 1f, 1f, 1f);
+        private Num.Vector4 _faceLineCol = new Num.Vector4(1f, 1f, 1f, 1f);
+        private Num.Vector4 _refLineCol = new Num.Vector4(1f, 1f, 1f, 1f);
         private int dirtyHack = 0;
-        
+        private int _index = 0;
+        private int statusId = 0;
+        private List<int> id_list = new List<int>();
+
 
         public PixelPerfect(
             DalamudPluginInterface pluginInterface,
             CommandManager commandManager,
             ClientState clientState,
             Framework framework,
+            SigScanner sigScanner,
             GameGui gameGui,
-            Condition condition
+            Condition condition,
+            ChatGui chat
         )
         {
             _pi = pluginInterface;
@@ -75,6 +100,7 @@ namespace PixelPerfect
             _fw = framework;
             _gui = gameGui;
             _condition = condition;
+            _chat = chat;
 
             _configuration = pluginInterface.GetPluginConfig() as Config ?? new Config();
             _ring = _configuration.Ring;
@@ -96,24 +122,176 @@ namespace PixelPerfect
             _north1 = _configuration.North1;
             _north2 = _configuration.North2;
             _north3 = _configuration.North3;
+            _face = _configuration.Face;
+            _ref = _configuration.Ref;
+            _auto = _configuration.Auto;
+            _showid = _configuration.ShowId;
+            _showself = _configuration.ShowSelf;
+            _statusId = _configuration.StatusId;
+            _nid = _configuration.Nid;
             _lineOffset = _configuration.LineOffset;
             _lineLength = _configuration.LineLength;
+            _faceLineLength = _configuration.FaceLineLength;
+            _refLineLength = _configuration.RefLineLength;
             _chevLength = _configuration.ChevLength;
             _chevOffset = _configuration.ChevOffset;
             _chevRad = _configuration.ChevRad;
             _chevSin = _configuration.ChevSin;
             _chevThicc = _configuration.ChevThicc;
             _lineThicc = _configuration.LineThicc;
+            _faceLineThicc = _configuration.FaceLineThicc;
+            _refLineThicc = _configuration.RefLineThicc;
             _chevCol = _configuration.ChevCol;
             _lineCol = _configuration.LineCol;
+            _faceLineCol = _configuration.FaceLineCol;
+            _refLineCol = _configuration.RefLineCol;
+            
+
+            SigScanner = sigScanner;
             
             pluginInterface.UiBuilder.Draw += DrawWindow;
             pluginInterface.UiBuilder.OpenConfigUi += ConfigWindow;
+             _fw.Update += FrameworkOnUpdate;
+
+
+
             commandManager.AddHandler("/pp", new CommandInfo(Command)
             {
                 HelpMessage = "Pixel Perfect config." +
                               "\nArguments of 'ring', 'ring2', 'north' will enable/disable those features."
             });
+        }
+
+        private void FrameworkOnUpdate(Framework framework)
+        {
+#if DEBUG
+                try
+                {
+ 
+                    UpdateTargetStatus();
+
+                }
+                catch (Exception ex)
+                {
+                    PluginLog.Error(ex.ToString());
+                }
+#else
+                UpdateTargetStatus();
+
+                
+        #endif
+        }
+
+        private void UpdateTargetStatus()
+        {
+            var localPlayer = _cs.LocalPlayer;
+            var statusList = localPlayer.StatusList;
+            var length = statusList.Length;
+            var new_flag = false;
+            var ref_flag = false;
+            var nid_b_flag = false;
+            var nid_f_flag = false;
+
+
+            var selfid = localPlayer.ObjectId;
+            ref_flag = false;
+            nid_b_flag = false;
+            nid_f_flag = false;
+            for (var i = 0; i < length; i++)
+            {
+                statusId = (int)statusList[i].StatusId;
+                var sourcesid = statusList[i].SourceID;
+
+                /*
+                var sourcesid = statusList[i].SourceID;
+                if (sourcesid != 3758096384 && sourcesid != 0)
+                {
+                    _chat.Print($"{i}, {statusid}");
+                }*/
+                if (statusId != 0)
+                {
+                    if (_showid)
+                    {
+                        new_flag = true;
+                        for (var j = 0; j < id_list.Count; j++)
+                        {
+                            if (id_list[j] == statusId)
+                            {
+                                new_flag = false;
+                            }
+                        }
+                        
+                        if (!_showself)
+                        {
+                            
+                            if (sourcesid == selfid)
+                            {
+                                new_flag = false;
+                            }
+                        }
+
+                        if (new_flag)
+                        {
+                            id_list.Add(statusId);
+                            _chat.Print($"status#{_index + 1}: {statusId}, from {sourcesid}");
+                            _index++;
+                        }
+                    }
+
+                    if (_nid)
+                    {
+                        if (statusId == 2757)
+                        {
+                            nid_f_flag = true;
+                        }
+                        else if(statusId == 2756)
+                        {
+                            nid_b_flag = true;
+                        }
+                    }
+
+                    if (_auto)
+                    {
+                        if (statusId == _statusId)
+                        {
+                            ref_flag = true;
+                        }
+                    }
+                }
+            }
+            if (_auto)
+            {
+                if (ref_flag)
+                {
+                    _ref = true;
+                }
+                else
+                {
+                    _ref = false;
+                }
+            }
+
+            if (_nid)
+            {
+                if (nid_b_flag)
+                {
+                    _nid_b = true;
+                }
+                else
+                {
+                    _nid_b = false;
+                }
+
+                if (nid_f_flag)
+                {
+                    _nid_f = true;
+                }
+                else
+                {
+                    _nid_f = false;
+                }
+            }
+
         }
 
         private void ConfigWindow()
@@ -127,6 +305,9 @@ namespace PixelPerfect
             _pi.UiBuilder.Draw -= DrawWindow;
             _pi.UiBuilder.OpenConfigUi -= ConfigWindow;
             _cm.RemoveHandler("/pp");
+            _fw.Update -= FrameworkOnUpdate;
+            
+            
         }
 
 
@@ -254,10 +435,91 @@ namespace PixelPerfect
                         }
                     }
                 }
+                ImGui.Separator();
+                ImGui.Checkbox("Face Pointer", ref _face);
+                if (ImGui.IsItemHovered())
+                {
+                    ImGui.SetTooltip("where is my tower?");
+                }
 
-                
-                
-                
+                if (_face | _auto)
+                {
+                    ImGui.SameLine();
+                    ImGui.Checkbox("Reference Bar", ref _ref);
+                    if (ImGui.IsItemHovered())
+                    {
+                        ImGui.SetTooltip("A reference line to place the tower");
+                    }
+                }
+                ImGui.Checkbox("Auto Switch Reference Bar", ref _auto);
+                if (ImGui.IsItemHovered())
+                {
+                    ImGui.SetTooltip("where is my tower?");
+                }
+                if (_auto)
+                {
+                    ImGui.SameLine();
+                    ImGui.Checkbox("DRU p3", ref _nid);
+                }
+
+                if (_face | _auto)
+                {
+                    ImGui.DragFloat("Face Pointer Line Length", ref _faceLineLength);
+                    if (ImGui.IsItemHovered())
+                    {
+                        ImGui.SetTooltip("How long the line is");
+                    }
+                    ImGui.DragFloat("Face Pointer Line Thickness", ref _faceLineThicc);
+                    if (ImGui.IsItemHovered())
+                    {
+                        ImGui.SetTooltip("How thicc the line is");
+                    }
+                    ImGui.ColorEdit4("Face Pointer Line Colour", ref _faceLineCol, ImGuiColorEditFlags.NoInputs);
+                    if (ImGui.IsItemHovered())
+                    {
+                        ImGui.SetTooltip("The colour of the line");
+                    }
+                    if (_ref | _auto)
+                    {
+                        ImGui.DragFloat("Reference Line Length", ref _refLineLength);
+                        if (ImGui.IsItemHovered())
+                        {
+                            ImGui.SetTooltip("How long the line is");
+                        }
+                        ImGui.DragFloat("Reference Line Thickness", ref _refLineThicc);
+                        if (ImGui.IsItemHovered())
+                        {
+                            ImGui.SetTooltip("How thicc the line is");
+                        }
+                        ImGui.ColorEdit4("Reference Line Colour", ref _refLineCol, ImGuiColorEditFlags.NoInputs);
+                        if (ImGui.IsItemHovered())
+                        {
+                            ImGui.SetTooltip("The colour of the line");
+                        }
+                    }
+                }
+                if (_auto)
+                {
+                    ImGui.InputInt("Status ID", ref _statusId);
+                    if (ImGui.IsItemHovered())
+                    {
+                        ImGui.SetTooltip("Status ID");
+                    }
+                }
+
+                ImGui.Checkbox("Print Status ID", ref _showid);
+                if (_showid)
+                {
+                    ImGui.SameLine();
+                    ImGui.Checkbox("Print self Status", ref _showself);
+                }
+                if (ImGui.Button("Clear Status ID list"))
+                {
+                    id_list = new List<int>();
+                    _index = 0;
+                }
+
+
                 ImGui.Separator();
                 ImGui.Checkbox("Ring", ref _ring);
                 if (ImGui.IsItemHovered())
@@ -462,7 +724,61 @@ namespace PixelPerfect
                         ImGui.GetColorU32(_chevCol), _chevThicc);
                 }
             }
+            if (_face)
+            {
+                _gui.WorldToScreen(new Num.Vector3(
+                            actor.Position.X + (_faceLineLength * (float)Math.Sin(actor.Rotation)),
+                            actor.Position.Y,
+                            actor.Position.Z + (_faceLineLength * (float)Math.Cos(actor.Rotation))
+                        ),
+                        out Num.Vector2 faceLineTip);
+                ImGui.GetWindowDrawList().AddLine(new Num.Vector2(faceLineTip.X, faceLineTip.Y), new Num.Vector2(pos.X, pos.Y),
+                        ImGui.GetColorU32(_faceLineCol), _faceLineThicc);
+            }
+            if (_ref)
+            {
+                _gui.WorldToScreen(new Num.Vector3(
+                        actor.Position.X + (_refLineLength * (float)Math.Sin(Math.PI / 2)),
+                        actor.Position.Y,
+                        actor.Position.Z + (_refLineLength * (float)Math.Cos(Math.PI / 2))
+                    ),
+                    out Num.Vector2 refEnd1);
+                _gui.WorldToScreen(new Num.Vector3(
+                        actor.Position.X - (_refLineLength * (float)Math.Sin(Math.PI / 2)),
+                        actor.Position.Y,
+                        actor.Position.Z - (_refLineLength * (float)Math.Cos(Math.PI / 2))
+                    ),
+                    out Num.Vector2 refEnd2);
+                ImGui.GetWindowDrawList().AddLine(new Num.Vector2(refEnd1.X, refEnd1.Y), new Num.Vector2(refEnd2.X, refEnd2.Y),
+                        ImGui.GetColorU32(_refLineCol), _refLineThicc);
+            }
+            if (_nid)
+            {
+                if (_nid_f)
+                {
+                    _gui.WorldToScreen(new Num.Vector3(
+                        actor.Position.X + (_refLineLength * (float)Math.Sin(Math.PI / 2)),
+                        actor.Position.Y,
+                        actor.Position.Z + (_refLineLength * (float)Math.Cos(Math.PI / 2))
+                    ),
+                    out Num.Vector2 refEnd);
+                ImGui.GetWindowDrawList().AddLine(new Num.Vector2(refEnd.X, refEnd.Y), new Num.Vector2(pos.X, pos.Y),
+                        ImGui.GetColorU32(_refLineCol), _refLineThicc);
+                }
+                if (_nid_b)
+                {
+                    _gui.WorldToScreen(new Num.Vector3(
+                        actor.Position.X - (_refLineLength * (float)Math.Sin(Math.PI / 2)),
+                        actor.Position.Y,
+                        actor.Position.Z - (_refLineLength * (float)Math.Cos(Math.PI / 2))
+                    ),
+                    out Num.Vector2 refEnd);
+                ImGui.GetWindowDrawList().AddLine(new Num.Vector2(refEnd.X, refEnd.Y), new Num.Vector2(pos.X, pos.Y),
+                        ImGui.GetColorU32(_refLineCol), _refLineThicc);
+                }
+            }
             
+
             ImGui.End();
             ImGui.PopStyleVar();
         }
@@ -481,6 +797,14 @@ namespace PixelPerfect
             else if(arguments == "north")
             {
                 _north1 = !_north1;
+            }
+            else if (arguments == "face")
+            {
+                _face = !_face;
+            }
+            else if (arguments == "ref")
+            {
+                _ref = !_ref;
             }
             else
             {
@@ -510,16 +834,31 @@ namespace PixelPerfect
             _configuration.North1 = _north1;
             _configuration.North2 = _north2;
             _configuration.North3 = _north3;
+            _configuration.Face = _face;
+            _configuration.Ref = _ref;
+            _configuration.Auto = _auto;
+            _configuration.Nid = _nid;
+            _configuration.Nid_b = _nid_b;
+            _configuration.Nid_f = _nid_f;
+            _configuration.ShowId = _showid;
+            _configuration.ShowSelf = _showself;
+            _configuration.StatusId = _statusId;
             _configuration.LineOffset = _lineOffset;
             _configuration.LineLength = _lineLength;
+            _configuration.FaceLineLength = _faceLineLength;
+            _configuration.RefLineLength = _refLineLength;
             _configuration.ChevLength = _chevLength;
             _configuration.ChevOffset = _chevOffset;
             _configuration.ChevRad = _chevRad;
             _configuration.ChevSin = _chevSin;
             _configuration.ChevThicc = _chevThicc;
             _configuration.LineThicc = _lineThicc;
+            _configuration.FaceLineThicc = _faceLineThicc;
+            _configuration.RefLineThicc = _refLineThicc;
             _configuration.ChevCol = _chevCol;
             _configuration.LineCol = _lineCol;
+            _configuration.FaceLineCol = _faceLineCol;
+            _configuration.RefLineCol = _refLineCol;
             _pi.SavePluginConfig(_configuration);
         }
 
@@ -563,15 +902,31 @@ namespace PixelPerfect
         public bool North1 { get; set; } = false;
         public bool North2 { get; set; } = false;
         public bool North3 { get; set; } = false;
+        public bool Face { get; set; } = false;
+        public bool Ref { get; set; } = false;
+        public bool Auto { get; set; } = false;
+        public bool Nid { get; set; } = false;
+        public bool Nid_f { get; set; } = false;
+        public bool Nid_b { get; set; } = false;
+        public bool ShowId { get; set; } = false;
+        public bool ShowSelf { get; set; } = false;
+        public int StatusId { get; set; } = 0;
         public float LineOffset { get; set; } = 0.5f;
         public float LineLength { get; set; } = 1f;
+        public float FaceLineOffset { get; set; } = 0.5f;
+        public float FaceLineLength { get; set; } = 1f;
+        public float RefLineLength { get; set; } = 1f;
         public float ChevLength { get; set; } = 1f;
         public float ChevOffset { get; set; } = 1f;
         public float ChevRad { get; set; } = 11.5f;
         public float ChevSin { get; set; } = -1.5f;
         public float ChevThicc { get; set; } = 5f;
         public float LineThicc { get; set; } = 5f;
+        public float FaceLineThicc { get; set; } = 5f;
+        public float RefLineThicc { get; set; } = 5f;
         public Num.Vector4 ChevCol { get; set; } = new Num.Vector4(0.4f, 0.4f, 0.4f, 0.5f);
         public Num.Vector4 LineCol { get; set; } = new Num.Vector4(0.4f, 0.4f, 0.4f, 0.5f);
+        public Num.Vector4 FaceLineCol { get; set; } = new Num.Vector4(0.4f, 0.4f, 0.4f, 0.5f);
+        public Num.Vector4 RefLineCol { get; set; } = new Num.Vector4(0.4f, 0.4f, 0.4f, 0.5f);
     }
 }
