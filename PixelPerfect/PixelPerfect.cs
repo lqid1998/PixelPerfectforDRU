@@ -59,8 +59,7 @@ namespace PixelPerfect
         private int _statusId;
         private bool _showid;
         private bool _showself;
-        private bool _nid_f;
-        private bool _nid_b;
+        private bool _nid_buff;
         private float _lineOffset = 0.6f;
         private float _lineLength = 1f;
         private float _faceLineLength = 1f;
@@ -129,6 +128,7 @@ namespace PixelPerfect
             _showself = _configuration.ShowSelf;
             _statusId = _configuration.StatusId;
             _nid = _configuration.Nid;
+            _nid_buff = _configuration.Nid_buff;
             _lineOffset = _configuration.LineOffset;
             _lineLength = _configuration.LineLength;
             _faceLineLength = _configuration.FaceLineLength;
@@ -189,14 +189,12 @@ namespace PixelPerfect
             var length = statusList.Length;
             var new_flag = false;
             var ref_flag = false;
-            var nid_b_flag = false;
-            var nid_f_flag = false;
+            var nid_buff_flag = false;
 
 
             var selfid = localPlayer.ObjectId;
             ref_flag = false;
-            nid_b_flag = false;
-            nid_f_flag = false;
+            nid_buff_flag = false;
             for (var i = 0; i < length; i++)
             {
                 statusId = (int)statusList[i].StatusId;
@@ -240,13 +238,10 @@ namespace PixelPerfect
 
                     if (_nid)
                     {
-                        if (statusId == 2756)
+                        if (statusId == 2756 | statusId == 2757)
+                        /*if (statusId == 1231 | statusId == 1232)*/
                         {
-                            nid_f_flag = true;
-                        }
-                        else if(statusId == 2757)
-                        {
-                            nid_b_flag = true;
+                            nid_buff_flag = true;
                         }
                     }
 
@@ -273,22 +268,13 @@ namespace PixelPerfect
 
             if (_nid)
             {
-                if (nid_b_flag)
+                if (nid_buff_flag)
                 {
-                    _nid_b = true;
+                    _nid_buff = true;
                 }
                 else
                 {
-                    _nid_b = false;
-                }
-
-                if (nid_f_flag)
-                {
-                    _nid_f = true;
-                }
-                else
-                {
-                    _nid_f = false;
+                    _nid_buff = false;
                 }
             }
 
@@ -744,31 +730,18 @@ namespace PixelPerfect
                 ImGui.GetWindowDrawList().AddLine(new Num.Vector2(refEnd1.X, refEnd1.Y), new Num.Vector2(refEnd2.X, refEnd2.Y),
                         ImGui.GetColorU32(_refLineCol), _refLineThicc);
             }
-            if (_nid)
+            if (_nid_buff)
             {
-                if (_nid_f)
-                {
-                    _gui.WorldToScreen(new Num.Vector3(
-                        actor.Position.X + (_refLineLength * (float)Math.Sin(Math.PI / 2)),
-                        actor.Position.Y,
-                        actor.Position.Z + (_refLineLength * (float)Math.Cos(Math.PI / 2))
-                    ),
-                    out Num.Vector2 refEnd);
-                ImGui.GetWindowDrawList().AddLine(new Num.Vector2(refEnd.X, refEnd.Y), new Num.Vector2(pos.X, pos.Y),
-                        ImGui.GetColorU32(_refLineCol), _refLineThicc);
-                }
-                if (_nid_b)
-                {
-                    _gui.WorldToScreen(new Num.Vector3(
-                        actor.Position.X - (_refLineLength * (float)Math.Sin(Math.PI / 2)),
-                        actor.Position.Y,
-                        actor.Position.Z - (_refLineLength * (float)Math.Cos(Math.PI / 2))
-                    ),
-                    out Num.Vector2 refEnd);
-                ImGui.GetWindowDrawList().AddLine(new Num.Vector2(refEnd.X, refEnd.Y), new Num.Vector2(pos.X, pos.Y),
-                        ImGui.GetColorU32(_refLineCol), _refLineThicc);
-                }
+                _gui.WorldToScreen(new Num.Vector3(
+                    actor.Position.X + (_refLineLength * (float)Math.Sin(Math.PI / 2)),
+                    actor.Position.Y,
+                    actor.Position.Z + (_refLineLength * (float)Math.Cos(Math.PI / 2))
+                ),
+                out Num.Vector2 refEnd);
+            ImGui.GetWindowDrawList().AddLine(new Num.Vector2(refEnd.X, refEnd.Y), new Num.Vector2(pos.X, pos.Y),
+                    ImGui.GetColorU32(_refLineCol), _refLineThicc);
             }
+            
             
 
             ImGui.End();
@@ -830,8 +803,7 @@ namespace PixelPerfect
             _configuration.Ref = _ref;
             _configuration.Auto = _auto;
             _configuration.Nid = _nid;
-            _configuration.Nid_b = _nid_b;
-            _configuration.Nid_f = _nid_f;
+            _configuration.Nid_buff = _nid_buff;
             _configuration.ShowId = _showid;
             _configuration.ShowSelf = _showself;
             _configuration.StatusId = _statusId;
@@ -898,8 +870,7 @@ namespace PixelPerfect
         public bool Ref { get; set; } = false;
         public bool Auto { get; set; } = false;
         public bool Nid { get; set; } = false;
-        public bool Nid_f { get; set; } = false;
-        public bool Nid_b { get; set; } = false;
+        public bool Nid_buff { get; set; } = false;
         public bool ShowId { get; set; } = false;
         public bool ShowSelf { get; set; } = false;
         public int StatusId { get; set; } = 0;
