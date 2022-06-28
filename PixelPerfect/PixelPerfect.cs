@@ -1,12 +1,14 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using Dalamud.Configuration;
+using FFXIVClientStructs.FFXIV.Client.Game;
+using FFXIVClientStructs.FFXIV.Client.Game.Character;
 using Dalamud.Game;
 using Dalamud.Game.ClientState;
 using Dalamud.Game.ClientState.Conditions;
 using Dalamud.Game.Command;
 using Dalamud.Game.Gui;
+using Dalamud.Logging;
 using Dalamud.Interface;
 using Dalamud.Plugin;
 using ImGuiNET;
@@ -27,7 +29,6 @@ namespace PixelPerfect
         private readonly Framework _fw;
         private readonly GameGui _gui;
         private readonly Condition _condition;
-        
         private readonly Config _configuration;
         private bool _enabled;
         private bool _config;
@@ -56,7 +57,10 @@ namespace PixelPerfect
         private bool _ref;
         private bool _auto;
         private bool _nid;
+        private bool _eye;
+        private bool _eye_cast;
         private int _statusId;
+        private int ThordanID;
         private bool _showid;
         private bool _showself;
         private bool _nid_buff;
@@ -70,10 +74,12 @@ namespace PixelPerfect
         private float _chevSin = 0.5f;
         private float _chevThicc = 10f;
         private float _lineThicc = 10f;
-        private float _faceLineThicc = 10f;
+        private float _eyethicc = 10f;
+        private float _faceLineThicc = 3f;
         private float _refLineThicc = 10f;
         private Num.Vector4 _chevCol = new Num.Vector4(1f, 1f, 1f, 1f);
         private Num.Vector4 _lineCol = new Num.Vector4(1f, 1f, 1f, 1f);
+        private Num.Vector4 _eyecolor = new Num.Vector4(1f, 0f, 0f, 1f);
         private Num.Vector4 _faceLineCol = new Num.Vector4(1f, 1f, 1f, 1f);
         private Num.Vector4 _refLineCol = new Num.Vector4(1f, 1f, 1f, 1f);
         private int dirtyHack = 0;
@@ -128,6 +134,10 @@ namespace PixelPerfect
             _showself = _configuration.ShowSelf;
             _statusId = _configuration.StatusId;
             _nid = _configuration.Nid;
+            _eye = _configuration.Eye;
+            _eye_cast = _configuration.Eye_cast;
+            _eyecolor = _configuration.Eyecolor;
+            _eyethicc = _configuration.EyeThicc;
             _nid_buff = _configuration.Nid_buff;
             _lineOffset = _configuration.LineOffset;
             _lineLength = _configuration.LineLength;
@@ -173,7 +183,7 @@ namespace PixelPerfect
                 }
                 catch (Exception ex)
                 {
-                    /*PluginLog.Error(ex.ToString());*/
+                    PluginLog.Error(ex.ToString());
                 }
 #else
                 UpdateTargetStatus();
@@ -182,102 +192,157 @@ namespace PixelPerfect
 #endif
         }
 
-        private void UpdateTargetStatus()
+        private unsafe void UpdateTargetStatus()
         {
             var localPlayer = _cs.LocalPlayer;
-            var statusList = localPlayer.StatusList;
-            var length = statusList.Length;
-            var new_flag = false;
-            var ref_flag = false;
-            var nid_buff_flag = false;
-
-
-            var selfid = localPlayer.ObjectId;
-            ref_flag = false;
-            nid_buff_flag = false;
-            for (var i = 0; i < length; i++)
+            if (!(localPlayer is null))
             {
-                statusId = (int)statusList[i].StatusId;
-                var sourcesid = statusList[i].SourceID;
 
-                /*
-                var sourcesid = statusList[i].SourceID;
-                if (sourcesid != 3758096384 && sourcesid != 0)
+
+                var statusList = localPlayer.StatusList;
+                var length = statusList.Length;
+                var new_flag = false;
+                var ref_flag = false;
+                var nid_buff_flag = false;
+                var eye_cast_flag = false;
+
+                var selfid = localPlayer.ObjectId;
+                ref_flag = false;
+                nid_buff_flag = false;
+                eye_cast_flag = false;
+
+
+                for (var i = 0; i < length; i++)
                 {
-                    _chat.Print($"{i}, {statusid}");
-                }*/
-                if (statusId != 0)
-                {
-                    if (_showid)
+                    statusId = (int)statusList[i].StatusId;
+                    var sourcesid = statusList[i].SourceID;
+
+                    /*
+                    var sourcesid = statusList[i].SourceID;
+                    if (sourcesid != 3758096384 && sourcesid != 0)
                     {
-                        new_flag = true;
-                        for (var j = 0; j < id_list.Count; j++)
+                        _chat.Print($"{i}, {statusid}");
+                    }*/
+                    if (statusId != 0)
+                    {
+                        if (_showid)
                         {
-                            if (id_list[j] == statusId)
+                            new_flag = true;
+                            for (var j = 0; j < id_list.Count; j++)
                             {
-                                new_flag = false;
+                                if (id_list[j] == statusId)
+                                {
+                                    new_flag = false;
+                                }
+                            }
+
+                            if (!_showself)
+                            {
+
+                                if (sourcesid == selfid)
+                                {
+                                    new_flag = false;
+                                }
+                            }
+
+                            if (new_flag)
+                            {
+                                id_list.Add(statusId);
+                                _chat.Print($"status#{_index + 1}: {statusId}, from {sourcesid}");
+                                _index++;
                             }
                         }
-                        
-                        if (!_showself)
+
+                        if (_nid)
                         {
-                            
-                            if (sourcesid == selfid)
+                            if (statusId == 2756 | statusId == 2757)
+                            /*if (statusId == 1231 | statusId == 1232)*/
                             {
-                                new_flag = false;
+                                nid_buff_flag = true;
                             }
                         }
 
-                        if (new_flag)
+                        if (_auto)
                         {
-                            id_list.Add(statusId);
-                            _chat.Print($"status#{_index + 1}: {statusId}, from {sourcesid}");
-                            _index++;
-                        }
-                    }
-
-                    if (_nid)
-                    {
-                        if (statusId == 2756 | statusId == 2757)
-                        /*if (statusId == 1231 | statusId == 1232)*/
-                        {
-                            nid_buff_flag = true;
-                        }
-                    }
-
-                    if (_auto)
-                    {
-                        if (statusId == _statusId)
-                        {
-                            ref_flag = true;
+                            if (statusId == _statusId)
+                            {
+                                ref_flag = true;
+                            }
                         }
                     }
                 }
-            }
-            if (_auto)
-            {
-                if (ref_flag)
+                if (_eye)
                 {
-                    _ref = true;
+                    var Thordan_cast = 0;
+                    var targetID = (int)localPlayer.TargetObjectId;
+                    var target = CharacterManager.Instance()->LookupBattleCharaByObjectId(targetID);
+                    if (!(target is null))
+                    {
+                        ThordanID = targetID;
+                        Thordan_cast = (int)(*target).SpellCastInfo.ActionID;
+                    }
+                    else
+                    {
+                        if (ThordanID != 0)
+                        {
+                            var Thordan = CharacterManager.Instance()->LookupBattleCharaByObjectId(ThordanID);
+                            if (!(Thordan is null))
+                            {
+                                Thordan_cast = (int)(*Thordan).SpellCastInfo.ActionID;
+                            }
+
+                        }
+                    }
+
+
+                    if (Thordan_cast == 25552)
+                    {
+                        /*_chat.Print($"Thordan {ThordanID} cast {Thordan_cast}");*/
+                        eye_cast_flag = true;
+
+                    }
+
+                }
+                if (_auto)
+                {
+                    if (ref_flag)
+                    {
+                        _ref = true;
+                    }
+                    else
+                    {
+                        _ref = false;
+                    }
+                }
+
+                if (_nid)
+                {
+                    if (nid_buff_flag)
+                    {
+                        _nid_buff = true;
+                    }
+                    else
+                    {
+                        _nid_buff = false;
+                    }
+                }
+
+                if (_eye)
+                {
+#if DEBUG
+                    _eye_cast = true;
+#else
+                if (eye_cast_flag)
+                {
+                    _eye_cast = true;
                 }
                 else
                 {
-                    _ref = false;
+                    _eye_cast = false;
+                }
+#endif
                 }
             }
-
-            if (_nid)
-            {
-                if (nid_buff_flag)
-                {
-                    _nid_buff = true;
-                }
-                else
-                {
-                    _nid_buff = false;
-                }
-            }
-
         }
 
         private void ConfigWindow()
@@ -297,7 +362,7 @@ namespace PixelPerfect
         }
 
 
-        private void DrawWindow()
+        private unsafe void DrawWindow()
         {
             if (_config)
             {
@@ -504,9 +569,24 @@ namespace PixelPerfect
                     id_list = new List<int>();
                     _index = 0;
                 }
-
-
                 ImGui.Separator();
+
+                ImGui.Checkbox("Eye indicator", ref _eye);
+
+                if (_eye)
+                {
+                    ImGui.DragFloat("Eye indicator Line Thickness", ref _eyethicc);
+                    if (ImGui.IsItemHovered())
+                    {
+                        ImGui.SetTooltip("How thicc the line is");
+                    }
+                    ImGui.ColorEdit4("Eye indicator Line Colour", ref _eyecolor, ImGuiColorEditFlags.NoInputs);
+                    if (ImGui.IsItemHovered())
+                    {
+                        ImGui.SetTooltip("The colour of the line");
+                    }
+                }
+                    ImGui.Separator();
                 ImGui.Checkbox("Ring", ref _ring);
                 if (ImGui.IsItemHovered())
                 {
@@ -741,6 +821,48 @@ namespace PixelPerfect
             ImGui.GetWindowDrawList().AddLine(new Num.Vector2(refEnd.X, refEnd.Y), new Num.Vector2(pos.X, pos.Y),
                     ImGui.GetColorU32(_refLineCol), _refLineThicc);
             }
+
+            if (_eye_cast)
+            {
+#if DEBUG
+                var Thordan = CharacterManager.Instance()->LookupBattleCharaByObjectId(268786128);
+#else
+                var Thordan = CharacterManager.Instance()->LookupBattleCharaByObjectId(ThordanID);
+#endif
+                if (!(Thordan is null))
+                {
+
+
+                    var Thordan_obj = (*Thordan).Character.GameObject;
+
+                    var x_diff = Thordan_obj.Position.X - actor.Position.X;
+                    var y_diff = Thordan_obj.Position.Y - actor.Position.Y;
+                    var z_diff = Thordan_obj.Position.Z - actor.Position.Z;
+                    var dist = (float)Math.Sqrt(x_diff * x_diff + y_diff * y_diff + z_diff * z_diff);
+                    if (dist > 10)
+                    {
+                        Thordan_obj.Position.X = actor.Position.X + 15 * x_diff / dist;
+                        Thordan_obj.Position.Y = actor.Position.Y + 15 * y_diff / dist;
+                        Thordan_obj.Position.Z = actor.Position.Z + 15 * z_diff / dist;
+                    }
+#if DEBUG
+                    PluginLog.Information($"Thordan pos X differnece:{x_diff.ToString("n3")}, " +
+                        $"Y differnece:{y_diff.ToString("n3")}, " +
+                        $"Z differnece:{z_diff.ToString("n3")}," +
+                        $"dist:{dist}");
+#endif
+                    _gui.WorldToScreen(new Num.Vector3(
+                                Thordan_obj.Position.X,
+                                Thordan_obj.Position.Y,
+                                Thordan_obj.Position.Z
+                            ),
+                            out Num.Vector2 Thordan_pos);
+                    ImGui.GetWindowDrawList().AddLine(new Num.Vector2(Thordan_pos.X, Thordan_pos.Y), new Num.Vector2(pos.X, pos.Y),
+                            ImGui.GetColorU32(_eyecolor), _eyethicc);
+                }
+
+
+            }
             
             
 
@@ -803,6 +925,10 @@ namespace PixelPerfect
             _configuration.Ref = _ref;
             _configuration.Auto = _auto;
             _configuration.Nid = _nid;
+            _configuration.Eye = _eye;
+            _configuration.Eye_cast = _eye_cast;
+            _configuration.Eyecolor = _eyecolor;
+            _configuration.EyeThicc = _eyethicc;
             _configuration.Nid_buff = _nid_buff;
             _configuration.ShowId = _showid;
             _configuration.ShowSelf = _showself;
@@ -870,6 +996,8 @@ namespace PixelPerfect
         public bool Ref { get; set; } = false;
         public bool Auto { get; set; } = false;
         public bool Nid { get; set; } = false;
+        public bool Eye { get; set; } = false;
+        public bool Eye_cast { get; set; } = false;
         public bool Nid_buff { get; set; } = false;
         public bool ShowId { get; set; } = false;
         public bool ShowSelf { get; set; } = false;
@@ -885,10 +1013,12 @@ namespace PixelPerfect
         public float ChevSin { get; set; } = -1.5f;
         public float ChevThicc { get; set; } = 5f;
         public float LineThicc { get; set; } = 5f;
+        public float EyeThicc { get; set; } = 5f;
         public float FaceLineThicc { get; set; } = 5f;
         public float RefLineThicc { get; set; } = 5f;
         public Num.Vector4 ChevCol { get; set; } = new Num.Vector4(0.4f, 0.4f, 0.4f, 0.5f);
         public Num.Vector4 LineCol { get; set; } = new Num.Vector4(0.4f, 0.4f, 0.4f, 0.5f);
+        public Num.Vector4 Eyecolor { get; set; } = new Num.Vector4(0.4f, 0.4f, 0.4f, 0.5f);
         public Num.Vector4 FaceLineCol { get; set; } = new Num.Vector4(0.4f, 0.4f, 0.4f, 0.5f);
         public Num.Vector4 RefLineCol { get; set; } = new Num.Vector4(0.4f, 0.4f, 0.4f, 0.5f);
     }
